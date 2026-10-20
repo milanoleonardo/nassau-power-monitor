@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nassau Power</title>
+<meta name="description" content="Is the power on at the house in Nassau? Live status, outage history and a timeline of checks.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M9 1 3 9h4l-1 6 7-8H9z' fill='%23fab219'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --surface: #fcfcfb; --card: #ffffff; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --line: #e1e0d9; --good: #0ca30c; --critical: #d03b3b; --unknown: #b8b6ae;
+    --good-text: #006300; --critical-text: #b02a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #1a1a19; --card: #222221; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+      --line: #2c2c2a; --unknown: #4a4946; --good-text: #0ca30c; --critical-text: #e05c5c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #1a1a19; --card: #222221; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --line: #2c2c2a; --unknown: #4a4946; --good-text: #0ca30c; --critical-text: #e05c5c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--ink);
+         font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 56px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: var(--ink-2); margin: 0 0 24px; font-size: 14px; }
+  .hero { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+  .hero .label { color: var(--ink-2); font-size: 14px; }
+  .hero .value { font-size: 56px; font-weight: 600; line-height: 1.1; margin: 4px 0 8px; display: flex; align-items: center; gap: 14px; }
+  .hero .value .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--unknown); flex: none; }
+  .hero.up .value { color: var(--good-text); } .hero.up .dot { background: var(--good); }
+  .hero.down .value { color: var(--critical-text); } .hero.down .dot { background: var(--critical); }
+  .hero .since { color: var(--ink-2); }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0 0; padding: 16px 0 0; border-top: 1px solid var(--line); }
+  .meta div { font-size: 13px; color: var(--ink-2); } .meta b { display: block; font-size: 17px; font-weight: 600; color: var(--ink); }
+  section { margin-top: 28px; }
+  h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .range { display: flex; gap: 4px; }
+  .range button { font: inherit; font-size: 13px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink-2); cursor: pointer; }
+  .range button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .strip { position: relative; }
+  .strip svg { width: 100%; height: 72px; display: block; touch-action: none; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .legend .up::before { background: var(--good); } .legend .down::before { background: var(--critical); } .legend .unknown::before { background: var(--unknown); }
+  .tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--surface); font-size: 12px; padding: 6px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -100%); display: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 8px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .empty { color: var(--ink-2); font-size: 14px; }
+  .ongoing { color: var(--critical-text); font-weight: 600; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 12px; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Nassau Power</h1>
+  <p class="sub">Is the electricity on at the house? Checked every 10 minutes from the internet.</p>
+
+  <div class="hero" id="hero">
+    <div class="label">Power at the house is</div>
+    <div class="value"><span class="dot"></span><span id="state">Loading…</span></div>
+    <div class="since" id="since"></div>
+    <div class="meta">
+      <div>Last check<b id="lastcheck">–</b></div>
+      <div>Uptime, last 7 days<b id="up7">–</b></div>
+      <div>Uptime, last 30 days<b id="up30">–</b></div>
+      <div>Outages, last 30 days<b id="n30">–</b></div>
+    </div>
+  </div>
+
+  <section>
+    <h2><span>Timeline of checks</span>
+      <span class="range" role="group" aria-label="Range">
+        <button type="button" data-days="1">24 h</button>
+        <button type="button" data-days="7" aria-pressed="true">7 d</button>
+        <button type="button" data-days="30">30 d</button>
+      </span></h2>
+    <div class="strip">
+      <svg id="strip" role="img" aria-label="Timeline of power checks"></svg>
+      <div class="tip" id="tip"></div>
+    </div>
+    <div class="legend"><span class="up">Power on</span><span class="down">No reply (power off)</span><span class="unknown">Check inconclusive</span></div>
+  </section>
+
+  <section>
+    <h2>Outages</h2>
+    <div id="outages"></div>
+  </section>
+
+  <footer id="foot"></footer>
+</main>
+
+<script>
+const TZ = "America/Nassau";
+const fmtDT = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtDay = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, weekday: "short", day: "numeric", month: "short" });
+const fmtHM = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+const $ = id => document.getElementById(id);
+const ms = { min: 60e3, h: 3600e3, d: 86400e3 };
+
+function dur(s) {
+  if (s < 3600) return `${Math.round(s / 60)} min`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`;
+  return `${Math.floor(s / 86400)} d ${Math.round((s % 86400) / 3600)} h`;
+}
+function ago(d) {
+  const s = (Date.now() - d) / 1000;
+  return s < 90 ? "just now" : `${dur(s)} ago`;
+}
+
+let rows = [], status = null, days = 7;
+
+async function load() {
+  const bust = `?t=${Math.floor(Date.now() / 60e3)}`;
+  const [st, csv] = await Promise.all([
+    fetch("status.json" + bust).then(r => r.json()),
+    fetch("log.csv" + bust).then(r => r.text()),
+  ]);
+  status = st;
+  rows = csv.trim().split("\n").slice(1).map(l => {
+    const [ts, result, pu, pd, rtt] = l.split(",");
+    return { t: new Date(ts), result, pu: +pu, pd: +pd, rtt: rtt ? +rtt : null };
+  });
+  render();
+}
+
+function render() {
+  const hero = $("hero");
+  hero.className = "hero " + status.state;
+  $("state").textContent = status.state === "up" ? "ON" : status.state === "down" ? "OFF" : "UNKNOWN";
+  const since = status.since ? new Date(status.since) : null;
+  $("since").textContent = since
+    ? `${status.state === "up" ? "On" : "Off"} since ${fmtDT.format(since)} Nassau time (${dur((Date.now() - since) / 1000)})`
+    : "Not enough checks yet.";
+  const last = new Date(status.last_check);
+  const stale = Date.now() - last > 40 * ms.min;
+  $("lastcheck").textContent = `${ago(last)}${stale ? " ⚠︎ stale" : ""}`;
+  $("lastcheck").title = `${fmtDT.format(last)} Nassau time · ${status.probes_up}/${status.probes_done} probes reached the router` + (status.rtt_ms ? ` · ${status.rtt_ms} ms` : "");
+
+  $("up7").textContent = uptime(7);
+  $("up30").textContent = uptime(30);
+  const n30 = status.outages.filter(o => new Date(o.end || Date.now()) > Date.now() - 30 * ms.d).length;
+  $("n30").textContent = n30;
+
+  renderOutages();
+  renderStrip();
+  $("foot").innerHTML = `${status.checks_total.toLocaleString()} checks since ${fmtDT.format(new Date(status.log_start))}. An outage is declared after ${status.confirm_checks} consecutive failed checks (≈${status.confirm_checks * 10} min) and ends at the first successful one. Times are Nassau local time. <a href="log.csv">Raw log</a>.`;
+}
+
+function uptime(nDays) {
+  const start = Date.now() - nDays * ms.d;
+  let down = 0, span = Math.min(nDays * ms.d, Date.now() - new Date(status.log_start));
+  for (const o of status.outages) {
+    const s = Math.max(new Date(o.start), start), e = o.end ? new Date(o.end) : Date.now();
+    if (e > s) down += e - s;
+  }
+  if (span <= 0) return "–";
+  const pct = 100 * (1 - down / span);
+  return (pct >= 99.95 ? "100" : pct.toFixed(pct >= 99 ? 2 : 1)) + "%";
+}
+
+function renderOutages() {
+  const el = $("outages");
+  if (!status.outages.length) { el.innerHTML = `<p class="empty">No outages recorded yet.</p>`; return; }
+  el.innerHTML = `<table><thead><tr><th>Started</th><th>Ended</th><th>Duration</th></tr></thead><tbody>` +
+    status.outages.map(o => `<tr><td>${fmtDT.format(new Date(o.start))}</td><td>${o.end ? fmtDT.format(new Date(o.end)) : '<span class="ongoing">ongoing</span>'}</td><td class="num">${dur(o.duration_s)}</td></tr>`).join("") +
+    `</tbody></table>`;
+}
+
+function renderStrip() {
+  const svg = $("strip"), W = svg.clientWidth || 720, H = 72, top = 8, h = 36;
+  const end = Date.now(), start = end - days * ms.d;
+  const x = t => ((t - start) / (end - start)) * W;
+  const color = r => r === "up" ? "var(--good)" : r === "down" ? "var(--critical)" : "var(--unknown)";
+  let out = `<rect x="0" y="${top}" width="${W}" height="${h}" rx="4" fill="var(--line)"/>`;
+  // each check covers the interval up to the next check
+  let i = rows.findIndex((r, k) => (rows[k + 1] ? rows[k + 1].t : end) > start);
+  for (; i >= 0 && i < rows.length; i++) {
+    const r = rows[i], next = rows[i + 1];
+    const t0 = Math.max(r.t, start), t1 = Math.min(next ? next.t : end, end);
+    if (t1 <= t0) continue;
+    out += `<rect data-i="${i}" x="${x(t0).toFixed(2)}" y="${top}" width="${Math.max(1, x(t1) - x(t0)).toFixed(2)}" height="${h}" fill="${color(r.result)}"/>`;
+  }
+  // ticks on Nassau-local midnights (or every 6 h in the 24 h view), DST-safe
+  const hourOf = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" });
+  const fmt = days === 1 ? fmtHM : fmtDay;
+  let n = 0;
+  for (let t = Math.floor(end / ms.h) * ms.h; t > start; t -= ms.h) {
+    const hr = +hourOf.format(t);
+    if (days === 1 ? hr % 6 : hr) continue;
+    const label = days === 30 && n++ % 5 ? "" : fmt.format(new Date(t));
+    out += `<line x1="${x(t).toFixed(1)}" x2="${x(t).toFixed(1)}" y1="${top + h}" y2="${top + h + 5}" stroke="var(--muted)"/>` +
+      (label ? `<text x="${x(t).toFixed(1)}" y="${top + h + 20}" font-size="11" fill="var(--muted)" text-anchor="middle">${label}</text>` : "");
+  }
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = out;
+}
+
+const tip = $("tip");
+$("strip").addEventListener("pointermove", e => {
+  const r = e.target.dataset && e.target.dataset.i !== undefined ? rows[+e.target.dataset.i] : null;
+  if (!r) { tip.style.display = "none"; return; }
+  const txt = r.result === "up" ? `Power on · ${r.pu}/${r.pd} probes${r.rtt ? ` · ${r.rtt} ms` : ""}` : r.result === "down" ? `No reply from ${r.pd} probes` : "Inconclusive";
+  tip.textContent = `${fmtDT.format(r.t)} — ${txt}`;
+  const box = $("strip").parentElement.getBoundingClientRect();
+  tip.style.left = `${Math.min(Math.max(e.clientX - box.left, 90), box.width - 90)}px`;
+  tip.style.top = `${e.clientY - box.top - 10}px`;
+  tip.style.display = "block";
+});
+$("strip").addEventListener("pointerleave", () => tip.style.display = "none");
+document.querySelectorAll(".range button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".range button").forEach(o => o.setAttribute("aria-pressed", o === b));
+  days = +b.dataset.days; renderStrip();
+}));
+addEventListener("resize", () => status && renderStrip());
+load().catch(e => { $("state").textContent = "no data"; $("since").textContent = String(e); });
+setInterval(load, 5 * ms.min);
+</script>
+</body>
+</html>

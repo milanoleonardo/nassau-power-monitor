@@ -1,0 +1,37 @@
+name: check-power
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: check-power
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trace the router from Globalping probes
+        run: python3 check.py
+        env:
+          TARGETS: ${{ secrets.TARGETS }}
+          GLOBALPING_TOKEN: ${{ secrets.GLOBALPING_TOKEN }}
+
+      - name: Commit the result
+        run: |
+          git config user.name "power-monitor[bot]"
+          git config user.email "power-monitor@users.noreply.github.com"
+          git add docs/log.csv docs/status.json
+          git diff --cached --quiet && exit 0
+          state=$(python3 -c 'import json; print(json.load(open("docs/status.json"))["state"])')
+          git commit -q -m "check: $state"
+          for i in 1 2 3; do git push -q && exit 0; git pull -q --rebase; sleep 3; done
+          exit 1
