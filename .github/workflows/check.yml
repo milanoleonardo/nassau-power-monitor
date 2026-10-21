@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
+    inputs:
+      test_email:
+        description: "Send a test email instead of running a check"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -19,13 +24,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Send a test email
+        if: ${{ inputs.test_email }}
+        run: python3 notify.py
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ALERT_TO: ${{ secrets.ALERT_TO }}
+
       - name: Trace the router from Globalping probes
+        if: ${{ !inputs.test_email }}
         run: python3 check.py
         env:
           TARGETS: ${{ secrets.TARGETS }}
           GLOBALPING_TOKEN: ${{ secrets.GLOBALPING_TOKEN }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ALERT_TO: ${{ secrets.ALERT_TO }}
 
       - name: Commit the result
+        if: ${{ !inputs.test_email }}
         run: |
           git config user.name "power-monitor[bot]"
           git config user.email "power-monitor@users.noreply.github.com"

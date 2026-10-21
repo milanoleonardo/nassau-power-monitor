@@ -12,7 +12,8 @@ Rule: if any probe's trace ends with a reply from the router -> "up".
       anything else (API error, timeouts on the API side)  -> "unknown".
 
 An outage is declared only after CONFIRM_CHECKS consecutive "down" results, so a
-single bad measurement never shows up as a power cut.
+single bad measurement never shows up as a power cut. When the state flips to
+"down" (and again when it comes back "up") an email goes out via notify.py.
 """
 import csv
 import ipaddress
@@ -24,6 +25,8 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+
+import notify
 
 API = "https://api.globalping.io/v1/measurements"
 DOCS = Path(__file__).resolve().parent / "docs"
@@ -181,6 +184,8 @@ def main():
     if not TARGETS:
         sys.exit("TARGETS is not set")
     DOCS.mkdir(exist_ok=True)
+    previous = read_log()
+    before = build_status(previous) if previous else None
     result, up, done, rtt = run_checks()
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     append_log({"ts": now, "result": result, "probes_up": up, "probes_done": done,
@@ -188,6 +193,7 @@ def main():
     status = build_status(read_log())
     STATUS.write_text(json.dumps(status, indent=1) + "\n")
     print(f"{now}: {result} -> state={status['state']} since {status['since']}")
+    notify.on_transition(before, status)
 
 
 if __name__ == "__main__":
