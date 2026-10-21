@@ -14,13 +14,18 @@ from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 from zoneinfo import ZoneInfo
 
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip()
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
-SMTP_USER = os.environ.get("SMTP_USER", "").strip()
+def env(name, default=""):
+    """Unset repository secrets reach the workflow as empty strings, so treat '' as unset."""
+    return os.environ.get(name, "").strip() or default
+
+
+SMTP_HOST = env("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(env("SMTP_PORT", "465"))
+SMTP_USER = env("SMTP_USER")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
-ALERT_FROM = os.environ.get("ALERT_FROM", "").strip() or SMTP_USER
-ALERT_TO = [a.strip() for a in os.environ.get("ALERT_TO", "").split(",") if a.strip()]
-STATUS_URL = os.environ.get("STATUS_URL", "https://milanoleonardo.github.io/nassau-power-monitor/")
+ALERT_FROM = env("ALERT_FROM") or SMTP_USER
+ALERT_TO = [a.strip() for a in env("ALERT_TO").split(",") if a.strip()]
+STATUS_URL = env("STATUS_URL", "https://milanoleonardo.github.io/nassau-power-monitor/")
 
 TZ = ZoneInfo("America/Nassau")
 
