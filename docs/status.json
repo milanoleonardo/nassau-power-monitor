@@ -1,13 +1,13 @@
 {
  "state": "up",
  "since": "2026-10-20T15:11:54Z",
- "last_check": "2026-11-15T02:12:34Z",
+ "last_check": "2026-11-15T09:37:09Z",
  "last_result": "up",
  "probes_up": 3,
  "probes_done": 3,
- "rtt_ms": 44.9,
+ "rtt_ms": 52.3,
  "confirm_checks": 2,
  "log_start": "2026-10-20T15:11:54Z",
- "checks_total": 121,
+ "checks_total": 122,
  "outages": []
 }
